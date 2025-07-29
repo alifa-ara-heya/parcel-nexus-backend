@@ -5,7 +5,7 @@ import { Server } from 'http';
 
 
 let server: Server;
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 async function main() {
     try {
@@ -19,48 +19,37 @@ async function main() {
 
     } catch (error) {
         console.error('Error Connecting to MongoDB:', error);
+        process.exit(1);
     }
 }
 
 main();
 
-// unhandled promise rejection error
-process.on("unhandledRejection", err => {
-    console.log('Unhandled Rejection detected! Server shutting down..', err);
-
+const shutdown = () => {
     if (server) {
         server.close(() => {
-            process.exit(1)
-        })
+            process.exit(1);
+        });
+    } else {
+        process.exit(1);
     }
+};
 
-    process.exit(1)
+process.on('unhandledRejection', error => {
+    console.error('Unhandled Rejection detected! Server shutting down...', error);
+    shutdown();
+});
 
-})
+process.on('uncaughtException', error => {
+    console.error('Uncaught Exception detected! Server shutting down...', error);
+    shutdown();
+});
 
-// unhandled exception error
-process.on("uncaughtException", err => {
-    console.log('Uncaught Exception detected! Server shutting down..', err);
-
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
     if (server) {
         server.close(() => {
-            process.exit(1)
-        })
+            console.log('Process terminated.');
+        });
     }
-
-    process.exit(1)
-
-})
-
-// signal termination error
-process.on("SIGTERM", err => {
-    console.log('Sigterm signal received. Server shutting down..', err);
-
-    if (server) {
-        server.close(() => {
-            process.exit(1)
-        })
-    }
-
-    process.exit(1)
-})
+});
