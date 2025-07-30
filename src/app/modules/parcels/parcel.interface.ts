@@ -25,7 +25,6 @@ export interface IStatusLog {
 
 export interface IParcel {
     _id: Types.ObjectId;
-
     trackingNumber: string; // A unique tracking number, can be generated
 
     /** Reference to the User who sent the parcel. */
