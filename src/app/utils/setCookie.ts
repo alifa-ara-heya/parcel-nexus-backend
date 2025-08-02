@@ -8,8 +8,6 @@ export interface AuthTokens {
 
 export const setAuthCookie = (res: Response, tokenInfo: AuthTokens) => {
     if (tokenInfo.accessToken) {
-        console.log('tokenInfo, accessToken', tokenInfo.accessToken);
-
         res.cookie("accessToken", tokenInfo.accessToken, {
             httpOnly: true,
             secure: envVars.NODE_ENV === 'production',
@@ -18,8 +16,6 @@ export const setAuthCookie = (res: Response, tokenInfo: AuthTokens) => {
     }
 
     if (tokenInfo.refreshToken) {
-        console.log('tokenInfo.refreshToken', tokenInfo.refreshToken);
-
         res.cookie("refreshToken", tokenInfo.refreshToken, {
             httpOnly: true,
             secure: envVars.NODE_ENV === 'production',

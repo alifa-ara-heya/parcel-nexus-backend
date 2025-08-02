@@ -27,7 +27,6 @@ export const createNewAccessTokensWithRefreshToken = async (refreshToken: string
     const verifiedRefreshToken = verifyToken(refreshToken, envVars.JWT_REFRESH_SECRET);
 
     const isUserExist = await User.findOne({ email: verifiedRefreshToken.email })
-    console.log('isUserExist', isUserExist);
 
     if (!isUserExist) {
         throw new AppError(httpStatus.BAD_REQUEST, "User doesn't exist")
