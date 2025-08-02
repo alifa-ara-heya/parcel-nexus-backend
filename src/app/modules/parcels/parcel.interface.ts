@@ -12,6 +12,7 @@ export enum ParcelStatus {
 export interface IRecipient {
     name: string;
     email?: string; // Optional, recipient might not be a user
+    userId?: Types.ObjectId; // Optional: To link to a registered user
     phone: string;
     address: string;
 }
@@ -20,7 +21,8 @@ export interface IRecipient {
 export interface IStatusLog {
     currentStatus: ParcelStatus;
     timestamp: Date;
-    updatedBy?: Types.ObjectId // Optional: To track if an admin or delivery man updated it
+    updatedBy?: Types.ObjectId; // Optional: To track if an admin or delivery man updated it
+    note?: string; // Optional: A note for the status update
 }
 
 export interface IParcel {
