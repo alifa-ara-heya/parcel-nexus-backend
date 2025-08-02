@@ -4,6 +4,8 @@ import { AuthRoutes } from "../modules/auth/auth.route";
 
 export const router = Router();
 
+import { ParcelRoutes } from "../modules/parcels/parcel.route";
+
 const moduleRoutes = [
     {
         path: '/user',
@@ -12,6 +14,10 @@ const moduleRoutes = [
     {
         path: "/auth",
         route: AuthRoutes
+    },
+    {
+        path: "/parcels",
+        route: ParcelRoutes
     },
 ]
 

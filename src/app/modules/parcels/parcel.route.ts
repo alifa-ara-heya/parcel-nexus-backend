@@ -1,0 +1,31 @@
+import { Router } from 'express';
+import { checkAuth } from '../../middlewares/checkAuth';
+import { validateRequest } from '../../middlewares/validateRequest';
+import { parcelController } from './parcel.controller';
+import { createParcelZodSchema } from './parcel.validation';
+import { Role } from '../users/user.interface';
+
+const router = Router();
+
+router.post('/',
+    checkAuth(Role.USER),
+    validateRequest(createParcelZodSchema),
+    parcelController.createParcel
+);
+
+router.get('/me',
+    checkAuth(Role.USER),
+    parcelController.getMyParcels
+);
+
+router.get('/:id',
+    checkAuth(Role.USER, Role.ADMIN),
+    parcelController.getParcelById
+);
+
+router.patch('/:id/cancel',
+    checkAuth(Role.USER),
+    parcelController.cancelParcel
+);
+
+export const ParcelRoutes = router;
