@@ -2,19 +2,20 @@ import 'dotenv/config'
 import mongoose from "mongoose";
 import app from "./app";
 import { Server } from 'http';
+import { createAdmin } from './app/utils/seedAdmin';
 
 
 let server: Server;
 const port = process.env.PORT || 5000;
 
-async function main() {
+const startServer = async () => {
     try {
         await mongoose.connect(`${process.env.DB_URL}`)
 
         console.log('Connected to MongoDB using Mongoose');
 
         server = app.listen(port, () => {
-            console.log(`Server is listening on port ${port}`);
+            console.log(`Server is listening on port ${port}.`);
         })
 
     } catch (error) {
@@ -23,7 +24,11 @@ async function main() {
     }
 }
 
-main();
+(async () => {
+    await startServer()
+    await createAdmin()
+})();
+
 
 const shutdown = () => {
     if (server) {

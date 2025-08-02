@@ -40,6 +40,6 @@ export interface IUser {
     isVerified?: boolean;
     role: Role;
     auths: IAuthProvider[];
-    createdAt: Date;
-    updatedAt: Date;
+    /*  createdAt: Date;
+     updatedAt: Date; */
 }
