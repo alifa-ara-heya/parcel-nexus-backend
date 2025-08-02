@@ -8,31 +8,37 @@ import { IsActive } from '../modules/users/user.interface';
 
 export const checkAuth = (...authRoles: string[]) => async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const accessToken = req.headers.authorization;
+        const authHeader = req.headers.authorization;
 
-        if (!accessToken) {
-            throw new AppError(403, "No Token Received")
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            throw new AppError(httpStatus.UNAUTHORIZED, "You are not authorized!");
         }
 
-        const verifiedToken = verifyToken(accessToken, envVars.JWT_ACCESS_SECRET)
+        const token = authHeader.split(' ')[1];
+
+        if (!token) {
+            throw new AppError(httpStatus.UNAUTHORIZED, "You are not authorized!");
+        }
+
+        const verifiedToken = verifyToken(token, envVars.JWT_ACCESS_SECRET)
 
         const isUserExist = await User.findOne({ email: verifiedToken.email })
         console.log('User', isUserExist);
 
         if (!isUserExist) {
-            throw new AppError(httpStatus.BAD_REQUEST, "User doesn't exist")
+            throw new AppError(httpStatus.UNAUTHORIZED, "User with this token no longer exists.")
         }
 
         if (isUserExist.isActive === IsActive.BLOCKED || isUserExist.isActive === IsActive.INACTIVE) {
-            throw new AppError(httpStatus.BAD_REQUEST, `User is ${isUserExist.isActive}`)
+            throw new AppError(httpStatus.FORBIDDEN, `Your account is ${isUserExist.isActive.toLowerCase()}. Please contact support.`)
         }
 
         if (isUserExist.isDeleted) {
-            throw new AppError(httpStatus.BAD_REQUEST, "User is deleted")
+            throw new AppError(httpStatus.UNAUTHORIZED, "User with this token has been deleted.")
         }
 
         if (!authRoles.includes(verifiedToken.role)) {
-            throw new AppError(403, "You are not permitted to view this route!")
+            throw new AppError(httpStatus.FORBIDDEN, "You are not permitted to view this route!")
         }
 
         req.user = verifiedToken //we declared a global type for it in app> interface> index.d.ts

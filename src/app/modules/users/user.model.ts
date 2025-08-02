@@ -81,14 +81,15 @@ const userSchema = new Schema<IUser>({
 
 // pre-save middleware/hook to hash password
 userSchema.pre("save", async function (next) {
-    // only run this function if password was actually modified
+    // `this` refers to the document being saved
+    // Only hash the password if it has been modified (or is new) and is not null/undefined
     if (!this.isModified("password") || !this.password) {
         return next()
     }
 
     // hash the password
     this.password = await bcrypt.hash(
-        this.password,
+        this.password, // Now TypeScript knows `this.password` is a string
         Number(envVars.BCRYPT_SALT_ROUNDS));
 
     next()

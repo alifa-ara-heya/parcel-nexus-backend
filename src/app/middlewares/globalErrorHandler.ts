@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import AppError from "../utils/AppError";
 import { ZodError } from "zod";
 import { TErrorSources, TGenericErrorResponse } from "../interfaces/error.types";
+import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 
 /* interface TErrorSources {
     path: string;
@@ -80,6 +81,32 @@ const handleZodError = (err: ZodError): TGenericErrorResponse => {
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const handleJwtError = (err: JsonWebTokenError): TGenericErrorResponse => {
+    const errorSources: TErrorSources[] = [{
+        path: '',
+        message: "Invalid Token. Please log in again."
+    }];
+    return {
+        statusCode: 401,
+        message: "Unauthorized Access",
+        errorSources
+    }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const handleTokenExpiredError = (err: TokenExpiredError): TGenericErrorResponse => {
+    const errorSources: TErrorSources[] = [{
+        path: '',
+        message: "Your token has expired. Please log in again."
+    }];
+    return {
+        statusCode: 401,
+        message: "Token Expired",
+        errorSources
+    }
+}
+
 export const globalErrorHandler = (
     err: unknown,
     req: Request,
@@ -122,6 +149,20 @@ export const globalErrorHandler = (
     // duplicate error
     else if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === 11000) {
         const simplifiedError = handleDuplicateError(err)
+        statusCode = simplifiedError.statusCode;
+        message = simplifiedError.message;
+        errorSources = simplifiedError.errorSources ?? [];
+    }
+    // Token Expired Error
+    else if (err instanceof TokenExpiredError) {
+        const simplifiedError = handleTokenExpiredError(err);
+        statusCode = simplifiedError.statusCode;
+        message = simplifiedError.message;
+        errorSources = simplifiedError.errorSources ?? [];
+    }
+    // Other JWT Errors
+    else if (err instanceof JsonWebTokenError) {
+        const simplifiedError = handleJwtError(err);
         statusCode = simplifiedError.statusCode;
         message = simplifiedError.message;
         errorSources = simplifiedError.errorSources ?? [];
