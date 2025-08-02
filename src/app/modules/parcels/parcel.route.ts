@@ -24,7 +24,7 @@ router.get('/:id',
 );
 
 router.patch('/:id/cancel',
-    checkAuth(Role.USER),
+    checkAuth(Role.USER, Role.ADMIN),
     parcelController.cancelParcel
 );
 

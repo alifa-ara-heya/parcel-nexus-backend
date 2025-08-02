@@ -9,8 +9,11 @@ import { Role } from '../users/user.interface';
 const router = Router();
 
 router.post("/login", AuthControllers.credentialsLogin)
+
 router.post("/refresh-token", AuthControllers.getNewAccessToken)
+
 router.post('/logout', AuthControllers.logout)
+
 router.post("/reset-password", checkAuth(...Object.values(Role)), AuthControllers.resetPassword)
 
 router.get("/google", async (req: Request, res: Response, next: NextFunction) => {

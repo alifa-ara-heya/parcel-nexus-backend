@@ -4,6 +4,7 @@ import AppError from "../../utils/AppError";
 import { User } from "../users/user.model";
 import bcryptjs from 'bcryptjs'
 import { createNewAccessTokensWithRefreshToken } from '../../utils/userTokens';
+import { CustomJwtPayload } from '../../interfaces';
 // import { JwtPayload } from 'jsonwebtoken';
 // import { envVars } from '../../config/env';
 

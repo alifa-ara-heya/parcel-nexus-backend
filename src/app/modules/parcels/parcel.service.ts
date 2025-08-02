@@ -1,8 +1,9 @@
 import httpStatus from 'http-status-codes';
-import AppError from '../../utils/AppError';
-import { IParcel, ParcelStatus } from './parcel.interface';
-import { Parcel } from './parcel.model';
 import { Types } from 'mongoose';
+import AppError from '../../utils/AppError';
+import { User } from '../users/user.model';
+import { IParcel, IRecipient, ParcelStatus } from './parcel.interface';
+import { Parcel } from './parcel.model';
 
 /**
  * Creates a new parcel booking.
@@ -14,16 +15,51 @@ const createParcel = async (
     senderId: string | Types.ObjectId,
     payload: Partial<IParcel>,
 ): Promise<IParcel> => {
-    const { recipient } = payload;
+    // This variable will hold the final, validated recipient information.
+    let finalRecipient: IRecipient;
 
-    // If a userId for the recipient is provided, validate that it's a correct ObjectId format.
-    if (recipient?.userId && !Types.ObjectId.isValid(recipient.userId)) {
-        throw new AppError(httpStatus.BAD_REQUEST, 'Invalid receiver user ID format.');
+    // --- Smart Recipient Logic ---
+    // Case 1: The sender provides the recipient's userId to auto-populate details.
+    if (payload.recipient?.userId) {
+        // Validate the provided userId is a valid MongoDB ObjectId.
+        if (!Types.ObjectId.isValid(payload.recipient.userId)) {
+            throw new AppError(httpStatus.BAD_REQUEST, 'Invalid receiver user ID format.');
+        }
+
+        // Find the recipient user in the database.
+        const recipientUser = await User.findById(payload.recipient.userId);
+        if (!recipientUser) {
+            throw new AppError(httpStatus.NOT_FOUND, 'Recipient user with the provided ID was not found.');
+        }
+
+        // Automatically populate recipient details from the found user document.
+        // This ensures the data is accurate and up-to-date.
+        finalRecipient = {
+            userId: recipientUser._id,
+            name: recipientUser.name,
+            phone: recipientUser.phone || 'Not Provided', // Use fallback if user has no phone saved
+            address: recipientUser.address || 'Not Provided', // Use fallback if user has no address saved
+            email: recipientUser.email,
+        };
+    }
+    // Case 2: The sender provides recipient details manually.
+    else if (payload.recipient?.name && payload.recipient?.phone && payload.recipient?.address) {
+        finalRecipient = {
+            name: payload.recipient.name,
+            phone: payload.recipient.phone,
+            address: payload.recipient.address,
+            email: payload.recipient.email, // email is optional
+        };
+    }
+    // Case 3: Insufficient information was provided in the request.
+    else {
+        throw new AppError(httpStatus.BAD_REQUEST, 'You must provide either a recipient userId or the full recipient details (name, phone, and address).');
     }
 
     // Construct the data for the new parcel, combining the payload with server-generated data.
     const newParcelData = {
         ...payload,
+        recipient: finalRecipient, // Use the validated and populated recipient object.
         sender: new Types.ObjectId(senderId), // Set the sender from the authenticated user.
         currentStatus: ParcelStatus.PENDING, // Set the initial status.
         // Create the first entry in the status history log.
@@ -50,9 +86,20 @@ const createParcel = async (
  * @param senderId - The ID of the user whose parcels to retrieve.
  * @returns A promise that resolves to an array of parcel documents.
  */
-const getParcelsBySender = async (senderId: string | Types.ObjectId): Promise<IParcel[]> => {
-    // Find all parcels where the 'sender' field matches the provided senderId.
-    return Parcel.find({ sender: senderId });
+
+const getParcelsBySender = async (
+    senderId: string | Types.ObjectId,
+): Promise<{ parcels: IParcel[]; total: number }> => {
+    const filter = { sender: senderId };
+
+    // Run find and countDocuments queries in parallel for efficiency.
+    const [parcels, total] = await Promise.all([
+        Parcel.find(filter).sort({ createdAt: -1 }), // Sort by most recent
+        Parcel.countDocuments(filter),
+    ]);
+
+    // Return both the list of parcels and the total count.
+    return { parcels, total };
 };
 
 /**
@@ -60,18 +107,38 @@ const getParcelsBySender = async (senderId: string | Types.ObjectId): Promise<IP
  * @param parcelId - The ID of the parcel to retrieve.
  * @returns A promise that resolves to the parcel document or null if not found.
  */
-const getParcelById = async (parcelId: string): Promise<IParcel | null> => {
+const getParcelById = async (
+    parcelId: string,
+    user: { userId: string | Types.ObjectId; role: string },
+): Promise<IParcel | null> => {
     // Find a single parcel by its MongoDB document ID.
-    return Parcel.findById(parcelId);
+    const parcel = await Parcel.findById(parcelId);
+
+    // If no parcel is found, throw an error.
+    if (!parcel) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found');
+    }
+
+    // An ADMIN can view any parcel, so we return it immediately.
+    if (user.role === 'ADMIN') {
+        return parcel;
+    }
+
+    // A regular USER can only view a parcel if they are the sender.
+    if (parcel.sender.toString() !== user.userId.toString()) {
+        throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to view this parcel');
+    }
+
+    return parcel;
 };
 
 /**
  * Cancels a parcel booking.
  * @param parcelId - The ID of the parcel to cancel.
- * @param senderId - The ID of the user attempting to cancel the parcel.
+ * @param user - The user (with ID and role) attempting to cancel the parcel.
  * @returns A promise that resolves to the updated (cancelled) parcel document.
  */
-const cancelParcel = async (parcelId: string, senderId: string | Types.ObjectId): Promise<IParcel> => {
+const cancelParcel = async (parcelId: string, user: { userId: string | Types.ObjectId; role: string }): Promise<IParcel> => {
     // First, find the parcel by its ID.
     const parcel = await Parcel.findById(parcelId);
 
@@ -80,8 +147,8 @@ const cancelParcel = async (parcelId: string, senderId: string | Types.ObjectId)
         throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found');
     }
 
-    // Security check: Ensure the user trying to cancel is the one who created it.
-    if (parcel.sender.toString() !== senderId.toString()) {
+    // Security check: An ADMIN can cancel any parcel, otherwise only the sender can.
+    if (user.role !== 'ADMIN' && parcel.sender.toString() !== user.userId.toString()) {
         throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to cancel this parcel');
     }
 
@@ -97,8 +164,8 @@ const cancelParcel = async (parcelId: string, senderId: string | Types.ObjectId)
     parcel.statusHistory.push({
         currentStatus: ParcelStatus.CANCELLED,
         timestamp: new Date(),
-        updatedBy: new Types.ObjectId(senderId),
-        note: 'Parcel cancelled by sender.',
+        updatedBy: new Types.ObjectId(user.userId),
+        note: user.role === 'ADMIN' ? 'Parcel cancelled by admin.' : 'Parcel cancelled by sender.',
     });
 
     // Save the updated parcel document to the database.

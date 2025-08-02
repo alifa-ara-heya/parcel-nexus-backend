@@ -8,22 +8,7 @@ import passport from 'passport';
 import { createUserTokens } from '../../utils/userTokens';
 import { setAuthCookie } from '../../utils/setCookie';
 import { envVars } from '../../config/env';
-
-/* const loginUser = catchAsync(async (req: Request, res: Response) => {
-    const { accessToken, user } = await authService.loginUser(req.body);
-
-    // To prevent password from being sent in the response
-    const userResponse = JSON.parse(JSON.stringify(user));
-    delete userResponse.password;
-
-    sendResponse(res, {
-        statusCode: httpStatus.OK,
-        success: true,
-        message: 'User logged in successfully',
-        data: { user: userResponse, token: accessToken },
-    });
-}); */
-
+// import { CustomJwtPayload } from '../../interfaces';
 
 
 const credentialsLogin = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
@@ -117,10 +102,9 @@ const resetPassword = catchAsync(async (req: Request, res: Response, next: NextF
 
     const newPassword = req.body.newPassword;
     const oldPassword = req.body.oldPassword;
-    // We can safely assert the type here because the `checkAuth` middleware,
-    // which runs before this controller, guarantees that `req.user` will be
-    // a CustomJwtPayload and not undefined.
-    const decodedToken = req.user as CustomJwtPayload;
+    // We use the non-null assertion (!) because checkAuth middleware guarantees req.user exists.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const decodedToken = req.user!;
 
     await AuthServices.resetPassword(oldPassword, newPassword, decodedToken);
 
