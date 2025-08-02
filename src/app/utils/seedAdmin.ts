@@ -15,7 +15,7 @@ export const createAdmin = async () => {
             return
         }
 
-        console.log('Trying to create admin.');
+        console.log('Trying to create admin');
 
         const hashedPassword = await bcryptjs.hash(envVars.ADMIN_PASSWORD, envVars.BCRYPT_SALT_ROUNDS)
 
