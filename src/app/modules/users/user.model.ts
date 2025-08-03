@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { model, Query, Schema } from "mongoose";
 import { envVars } from "../../config/env";
-import { IAuthProvider, IsActive, IUser, Role } from "./user.interface";
+import { IAuthProvider, IsActive, IUser, IUserModel, Role } from "./user.interface";
 
 const authProviderSchema = new Schema<IAuthProvider>({
     provider: {
@@ -76,6 +76,19 @@ const userSchema = new Schema<IUser>({
     })
 
 // --------------------------------------------------
+// VIRTUALS
+// --------------------------------------------------
+
+// Create a virtual property `userId` that gets the string representation of `_id`
+userSchema.virtual('userId').get(function () {
+    return this._id.toHexString();
+});
+
+// Ensure virtuals are included when converting to JSON or a plain object
+userSchema.set('toJSON', { virtuals: true });
+userSchema.set('toObject', { virtuals: true });
+
+// --------------------------------------------------
 // MIDDLEWARE / HOOKS
 // --------------------------------------------------
 
@@ -113,4 +126,4 @@ userSchema.statics.isPasswordCorrect = async function (
 }
 
 
-export const User = model<IUser>("User", userSchema)
+export const User = model<IUser, IUserModel>("User", userSchema)

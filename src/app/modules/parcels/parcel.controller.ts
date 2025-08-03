@@ -1,16 +1,12 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import httpStatus from 'http-status-codes';
+import { AuthenticatedRequest } from '../../interfaces/request.types';
 import { catchAsync } from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { parcelService } from './parcel.service';
-// import { parcelService } from './parcel.service';
 
-const createParcel = catchAsync(async (req: Request, res: Response) => {
-    // We use the non-null assertion (!) because the checkAuth middleware guarantees
-    // that req.user will be populated on protected routes.
-
-    const senderId = req.user!.userId;
+const createParcel = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
+    const senderId = req.user.userId;
     const result = await parcelService.createParcel(senderId, req.body);
     sendResponse(res, {
         statusCode: httpStatus.CREATED,
@@ -20,9 +16,8 @@ const createParcel = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const getMyParcels = catchAsync(async (req: Request, res: Response) => {
-
-    const senderId = req.user!.userId;
+const getMyParcels = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
+    const senderId = req.user.userId;
     // The service now returns an object with the parcels array and the total count.
     const { parcels, total } = await parcelService.getParcelsBySender(senderId);
     sendResponse(res, {
@@ -35,10 +30,10 @@ const getMyParcels = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const getParcelById = catchAsync(async (req: Request, res: Response) => {
+const getParcelById = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
 
-    const { userId, role } = req.user!; // Extract user info from the authenticated request
+    const { userId, role } = req.user; // Extract user info from the authenticated request
 
     const result = await parcelService.getParcelById(parcelId, { userId, role });
     sendResponse(res, {
@@ -49,9 +44,9 @@ const getParcelById = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const cancelParcel = catchAsync(async (req: Request, res: Response) => {
+const cancelParcel = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
-    const { userId, role } = req.user!;
+    const { userId, role } = req.user;
 
     const result = await parcelService.cancelParcel(parcelId, { userId, role });
     sendResponse(res, {
@@ -62,7 +57,7 @@ const cancelParcel = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const getAllParcels = catchAsync(async (req: Request, res: Response) => {
+const getAllParcels = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     // In the future, we can pass query params for filtering/pagination here
     const { parcels, total } = await parcelService.getAllParcels();
     sendResponse(res, {
@@ -74,8 +69,8 @@ const getAllParcels = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const getIncomingParcels = catchAsync(async (req: Request, res: Response) => {
-    const receiverId = req.user!.userId;
+const getIncomingParcels = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
+    const receiverId = req.user.userId;
     const { parcels, total } = await parcelService.getParcelsByReceiver(receiverId);
     sendResponse(res, {
         statusCode: httpStatus.OK,
@@ -86,10 +81,10 @@ const getIncomingParcels = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const assignDeliveryMan = catchAsync(async (req: Request, res: Response) => {
+const assignDeliveryMan = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
     const { deliveryManId } = req.body;
-    const adminId = req.user!.userId;
+    const adminId = req.user.userId;
 
     const result = await parcelService.assignDeliveryMan(parcelId, deliveryManId, adminId);
     sendResponse(res, {
@@ -100,8 +95,8 @@ const assignDeliveryMan = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const getMyDeliveries = catchAsync(async (req: Request, res: Response) => {
-    const deliveryManId = req.user!.userId;
+const getMyDeliveries = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
+    const deliveryManId = req.user.userId;
     const { parcels, total } = await parcelService.getParcelsByDeliveryMan(deliveryManId);
     sendResponse(res, {
         statusCode: httpStatus.OK,
@@ -112,12 +107,12 @@ const getMyDeliveries = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const updateDeliveryStatus = catchAsync(async (req: Request, res: Response) => {
+const updateDeliveryStatus = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
     const { status } = req.body;
-    const user = req.user!;
+    const { userId, role } = req.user;
 
-    const result = await parcelService.updateDeliveryStatus(parcelId, status, user);
+    const result = await parcelService.updateDeliveryStatus(parcelId, status, { userId, role });
     sendResponse(res, {
         statusCode: httpStatus.OK,
         success: true,
@@ -126,11 +121,11 @@ const updateDeliveryStatus = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const confirmDelivery = catchAsync(async (req: Request, res: Response) => {
+const confirmDelivery = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
-    const user = req.user!;
+    const { userId, role } = req.user;
 
-    const result = await parcelService.confirmDelivery(parcelId, user);
+    const result = await parcelService.confirmDelivery(parcelId, { userId, role });
     sendResponse(res, {
         statusCode: httpStatus.OK,
         success: true,
@@ -139,9 +134,9 @@ const confirmDelivery = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const blockParcel = catchAsync(async (req: Request, res: Response) => {
+const blockParcel = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
-    const adminId = req.user!.userId;
+    const adminId = req.user.userId;
 
     const result = await parcelService.blockParcel(parcelId, adminId);
     sendResponse(res, {
@@ -152,9 +147,9 @@ const blockParcel = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-const unblockParcel = catchAsync(async (req: Request, res: Response) => {
+const unblockParcel = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const { id: parcelId } = req.params;
-    const adminId = req.user!.userId;
+    const adminId = req.user.userId;
 
     const result = await parcelService.unblockParcel(parcelId, adminId);
     sendResponse(res, {

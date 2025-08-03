@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { Model, Types } from "mongoose";
 
 /**
  * Roles for users in the system.
@@ -45,4 +45,16 @@ export interface IUser {
     auths: IAuthProvider[];
     /*  createdAt: Date;
      updatedAt: Date; */
+}
+
+export interface IUserVirtuals {
+    userId: string;
+}
+
+export interface IUserModel extends Model<IUser, object, object, IUserVirtuals> {
+    // eslint-disable-next-line no-unused-vars
+    isPasswordCorrect(
+        plainTextPassword: string,
+        hashedPassword: string,
+    ): Promise<boolean>;
 }

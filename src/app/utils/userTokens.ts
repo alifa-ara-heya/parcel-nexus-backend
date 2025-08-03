@@ -7,7 +7,7 @@ import { User } from '../modules/users/user.model';
 
 export const createUserTokens = (user: Partial<IUser>) => {
     const jwtPayload = {
-        userId: user._id,
+        userId: user._id, // Use 'userId' to match the CustomJwtPayload interface
         email: user.email,
         role: user.role
     }
@@ -41,7 +41,7 @@ export const createNewAccessTokensWithRefreshToken = async (refreshToken: string
     }
 
     const jwtPayload = {
-        userId: isUserExist._id,
+        userId: isUserExist._id, // Use 'userId' to match the CustomJwtPayload interface
         email: isUserExist.email,
         role: isUserExist.role
     }
