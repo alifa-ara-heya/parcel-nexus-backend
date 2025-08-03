@@ -126,6 +126,45 @@ const updateDeliveryStatus = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const confirmDelivery = catchAsync(async (req: Request, res: Response) => {
+    const { id: parcelId } = req.params;
+    const user = req.user!;
+
+    const result = await parcelService.confirmDelivery(parcelId, user);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Parcel delivery confirmed successfully',
+        data: result,
+    });
+});
+
+const blockParcel = catchAsync(async (req: Request, res: Response) => {
+    const { id: parcelId } = req.params;
+    const adminId = req.user!.userId;
+
+    const result = await parcelService.blockParcel(parcelId, adminId);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Parcel has been put on hold',
+        data: result,
+    });
+});
+
+const unblockParcel = catchAsync(async (req: Request, res: Response) => {
+    const { id: parcelId } = req.params;
+    const adminId = req.user!.userId;
+
+    const result = await parcelService.unblockParcel(parcelId, adminId);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Parcel has been unblocked',
+        data: result,
+    });
+});
+
 export const parcelController = {
     createParcel,
     getMyParcels,
@@ -136,4 +175,7 @@ export const parcelController = {
     assignDeliveryMan,
     getMyDeliveries,
     updateDeliveryStatus,
+    confirmDelivery,
+    blockParcel,
+    unblockParcel,
 };

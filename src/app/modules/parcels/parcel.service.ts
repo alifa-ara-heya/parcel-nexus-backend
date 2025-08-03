@@ -128,8 +128,7 @@ const getParcelById = async (
     // Find a single parcel by its MongoDB document ID.
     const parcel = await Parcel.findById(parcelId)
         .populate('sender', 'name email')
-        .populate('deliveryMan', 'name email phone')
-        .populate('statusHistory.updatedBy', 'name role');
+        .populate('deliveryMan', 'name email phone');
 
     // If no parcel is found, throw an error.
     if (!parcel) {
@@ -200,8 +199,7 @@ const cancelParcel = async (parcelId: string, user: { userId: string | Types.Obj
     // Return the updated parcel.
     return parcel.populate([
         { path: 'sender', select: 'name email' },
-        { path: 'deliveryMan', select: 'name email phone' },
-        { path: 'statusHistory.updatedBy', select: 'name role' }
+        { path: 'deliveryMan', select: 'name email phone' }
     ]);
 };
 
@@ -217,8 +215,7 @@ const getAllParcels = async (): Promise<{ parcels: IParcel[]; total: number }> =
     const [parcels, total] = await Promise.all([
         Parcel.find(filter)
             .populate('sender', 'name email')
-            .populate('deliveryMan', 'name email phone')
-            .populate('statusHistory.updatedBy', 'name role').sort({ createdAt: -1 }),
+            .populate('deliveryMan', 'name email phone').sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
 
@@ -245,7 +242,6 @@ const getParcelsByReceiver = async (
         Parcel.find(filter)
             .populate('sender', 'name email')
             .populate('deliveryMan', 'name email phone')
-            .populate('statusHistory.updatedBy', 'name role')
             .sort({ createdAt: -1 }), // Sort by most recent
         Parcel.countDocuments(filter),
     ]);
@@ -301,10 +297,7 @@ const assignDeliveryMan = async (
     });
 
     await parcel.save();
-    return parcel.populate([
-        { path: 'deliveryMan', select: 'name email phone' },
-        { path: 'statusHistory.updatedBy', 'select': 'name role' }
-    ]);
+    return parcel.populate('deliveryMan', 'name email phone');
 };
 
 /**
@@ -320,7 +313,6 @@ const getParcelsByDeliveryMan = async (
     const [parcels, total] = await Promise.all([
         Parcel.find(filter)
             .populate('sender', 'name email')
-            .populate('statusHistory.updatedBy', 'name role')
             .sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
@@ -381,9 +373,111 @@ const updateDeliveryStatus = async (
     await parcel.save();
     return parcel.populate([
         { path: 'deliveryMan', select: 'name email phone' },
+        { path: 'sender', select: 'name email' }
+    ]);
+};
+
+
+const blockParcel = async (parcelId: string, adminId: string | Types.ObjectId): Promise<IParcel> => {
+    const parcel = await Parcel.findById(parcelId);
+
+    if (!parcel) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
+    }
+
+    // A parcel cannot be blocked if it's already delivered, cancelled, or returned.
+    const finalStatuses = [ParcelStatus.DELIVERED, ParcelStatus.CANCELLED, ParcelStatus.RETURNED];
+    if (finalStatuses.includes(parcel.currentStatus)) {
+        throw new AppError(httpStatus.BAD_REQUEST, `Cannot block a parcel with status ${parcel.currentStatus}.`);
+    }
+
+    // Store the current status so we can revert to it later.
+    parcel.statusBeforeHold = parcel.currentStatus;
+    parcel.currentStatus = ParcelStatus.ON_HOLD;
+
+    parcel.statusHistory.push({
+        currentStatus: ParcelStatus.ON_HOLD,
+        timestamp: new Date(),
+        updatedBy: new Types.ObjectId(adminId),
+        note: 'Parcel put on hold by admin.',
+    });
+
+    await parcel.save();
+    return parcel.populate([
         { path: 'sender', select: 'name email' },
+        { path: 'deliveryMan', select: 'name email phone' },
         { path: 'statusHistory.updatedBy', select: 'name role' }
     ]);
+};
+
+const unblockParcel = async (parcelId: string, adminId: string | Types.ObjectId): Promise<IParcel> => {
+    const parcel = await Parcel.findById(parcelId);
+
+    if (!parcel) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
+    }
+
+    // A parcel can only be unblocked if it is ON_HOLD.
+    if (parcel.currentStatus !== ParcelStatus.ON_HOLD) {
+        throw new AppError(httpStatus.BAD_REQUEST, 'This parcel is not on hold.');
+    }
+
+    // Revert to the status it had before being held.
+    const previousStatus = parcel.statusBeforeHold || ParcelStatus.PENDING;
+    parcel.currentStatus = previousStatus;
+    parcel.statusBeforeHold = undefined; // Clear the temporary status
+
+    parcel.statusHistory.push({
+        currentStatus: previousStatus,
+        timestamp: new Date(),
+        updatedBy: new Types.ObjectId(adminId),
+        note: 'Parcel unblocked by admin.',
+    });
+
+    await parcel.save();
+    return parcel.populate([
+        { path: 'sender', select: 'name email' },
+        { path: 'deliveryMan', select: 'name email phone' },
+        { path: 'statusHistory.updatedBy', select: 'name role' }
+    ]);
+};
+
+/**
+ * Confirms the delivery of a parcel by the recipient.
+ * @param parcelId - The ID of the parcel to confirm.
+ * @param user - The user attempting to confirm delivery.
+ * @returns The updated parcel document.
+ */
+const confirmDelivery = async (
+    parcelId: string,
+    user: { userId: string | Types.ObjectId; role: string },
+): Promise<IParcel> => {
+    const parcel = await Parcel.findById(parcelId);
+
+    if (!parcel) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
+    }
+
+    // Authorization: Ensure the user is the intended recipient.
+    if (!parcel.recipient.userId || parcel.recipient.userId.toString() !== user.userId.toString()) {
+        throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to confirm delivery for this parcel.');
+    }
+
+    // Business Logic: Delivery can only be confirmed if the parcel is IN_TRANSIT.
+    if (parcel.currentStatus !== ParcelStatus.IN_TRANSIT) {
+        throw new AppError(httpStatus.BAD_REQUEST, `Cannot confirm delivery. Parcel status is currently ${parcel.currentStatus}.`);
+    }
+
+    parcel.currentStatus = ParcelStatus.DELIVERED;
+    parcel.statusHistory.push({
+        currentStatus: ParcelStatus.DELIVERED,
+        timestamp: new Date(),
+        updatedBy: new Types.ObjectId(user.userId),
+        note: 'Delivery confirmed by recipient.',
+    });
+
+    await parcel.save();
+    return parcel.populate('sender', 'name email');
 };
 
 // Export all service functions as a single object for the controller to use.
@@ -397,4 +491,7 @@ export const parcelService = {
     assignDeliveryMan,
     getParcelsByDeliveryMan,
     updateDeliveryStatus,
+    confirmDelivery,
+    blockParcel,
+    unblockParcel,
 };

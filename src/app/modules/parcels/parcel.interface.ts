@@ -7,7 +7,8 @@ export enum ParcelStatus {
     IN_TRANSIT = 'IN_TRANSIT', // On its way
     DELIVERED = 'DELIVERED', // Delivered to recipient
     CANCELLED = 'CANCELLED', // Cancelled by user
-    RETURNED = 'RETURNED', // Could not be delivered and returned to sender
+    RETURNED = 'RETURNED', // Could not be delivered and returned to sender,
+    ON_HOLD = 'ON_HOLD', // Temporarily held by an admin
 }
 
 export interface IRecipient {
@@ -43,6 +44,8 @@ export interface IParcel {
     pickupAddress?: string;
 
     currentStatus: ParcelStatus;
+
+    statusBeforeHold?: ParcelStatus; // To store the status before it was put on hold
 
     statusHistory: IStatusLog[]; // An array of all status changes
 

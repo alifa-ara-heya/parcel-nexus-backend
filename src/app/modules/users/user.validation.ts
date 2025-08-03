@@ -1,5 +1,5 @@
 import z from "zod";
-import { Role } from "./user.interface";
+import { IsActive, Role } from "./user.interface";
 
 export const createUserZodSchema = z.object({
     // body: z.object({ // Good practice to wrap in `body` for middleware
@@ -42,4 +42,8 @@ export const createUserZodSchema = z.object({
 
 export const assignRoleZodSchema = z.object({
     role: z.enum(Role, { error: "A valid role is required." }),
+});
+
+export const updateUserStatusZodSchema = z.object({
+    status: z.enum(IsActive, { error: "A valid status is required." }),
 });

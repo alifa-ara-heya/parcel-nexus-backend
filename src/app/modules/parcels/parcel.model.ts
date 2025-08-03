@@ -70,6 +70,10 @@ const parcelSchema = new Schema<IParcel>({
         enum: Object.values(ParcelStatus),
         default: ParcelStatus.PENDING
     },
+    statusBeforeHold: {
+        type: String,
+        enum: Object.values(ParcelStatus),
+    },
     statusHistory: [statusLogSchema],
     weight: {
         type: Number,

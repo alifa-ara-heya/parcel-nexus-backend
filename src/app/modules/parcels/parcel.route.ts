@@ -55,4 +55,14 @@ router.patch('/:id/update-delivery-status',
     parcelController.updateDeliveryStatus
 );
 
+router.patch('/:id/block',
+    checkAuth(Role.ADMIN),
+    parcelController.blockParcel
+);
+
+router.patch('/:id/unblock',
+    checkAuth(Role.ADMIN),
+    parcelController.unblockParcel
+);
+
 export const ParcelRoutes = router;
