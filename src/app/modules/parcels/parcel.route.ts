@@ -65,4 +65,9 @@ router.patch('/:id/unblock',
     parcelController.unblockParcel
 );
 
+router.patch('/:id/confirm-delivery',
+    checkAuth(Role.USER),
+    parcelController.confirmDelivery
+);
+
 export const ParcelRoutes = router;
