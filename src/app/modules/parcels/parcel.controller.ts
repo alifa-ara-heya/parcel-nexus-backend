@@ -115,9 +115,9 @@ const getMyDeliveries = catchAsync(async (req: Request, res: Response) => {
 const updateDeliveryStatus = catchAsync(async (req: Request, res: Response) => {
     const { id: parcelId } = req.params;
     const { status } = req.body;
-    const deliveryManId = req.user!.userId;
+    const user = req.user!;
 
-    const result = await parcelService.updateDeliveryStatus(parcelId, status, deliveryManId);
+    const result = await parcelService.updateDeliveryStatus(parcelId, status, user);
     sendResponse(res, {
         statusCode: httpStatus.OK,
         success: true,

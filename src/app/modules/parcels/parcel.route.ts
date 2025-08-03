@@ -50,7 +50,7 @@ router.patch('/:id/assign',
 );
 
 router.patch('/:id/update-delivery-status',
-    checkAuth(Role.DELIVERY_MAN),
+    checkAuth(Role.DELIVERY_MAN, Role.ADMIN),
     validateRequest(updateParcelStatusZodSchema),
     parcelController.updateDeliveryStatus
 );

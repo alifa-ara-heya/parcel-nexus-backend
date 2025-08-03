@@ -107,6 +107,7 @@ const getParcelsBySender = async (
     const [parcels, total] = await Promise.all([
         Parcel.find(filter)
             .populate('deliveryMan', 'name email phone')
+            .populate('statusHistory.updatedBy', 'name role')
             .sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
@@ -127,7 +128,8 @@ const getParcelById = async (
     // Find a single parcel by its MongoDB document ID.
     const parcel = await Parcel.findById(parcelId)
         .populate('sender', 'name email')
-        .populate('deliveryMan', 'name email phone');
+        .populate('deliveryMan', 'name email phone')
+        .populate('statusHistory.updatedBy', 'name role');
 
     // If no parcel is found, throw an error.
     if (!parcel) {
@@ -198,7 +200,8 @@ const cancelParcel = async (parcelId: string, user: { userId: string | Types.Obj
     // Return the updated parcel.
     return parcel.populate([
         { path: 'sender', select: 'name email' },
-        { path: 'deliveryMan', select: 'name email phone' }
+        { path: 'deliveryMan', select: 'name email phone' },
+        { path: 'statusHistory.updatedBy', select: 'name role' }
     ]);
 };
 
@@ -214,7 +217,8 @@ const getAllParcels = async (): Promise<{ parcels: IParcel[]; total: number }> =
     const [parcels, total] = await Promise.all([
         Parcel.find(filter)
             .populate('sender', 'name email')
-            .populate('deliveryMan', 'name email phone').sort({ createdAt: -1 }),
+            .populate('deliveryMan', 'name email phone')
+            .populate('statusHistory.updatedBy', 'name role').sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
 
@@ -241,6 +245,7 @@ const getParcelsByReceiver = async (
         Parcel.find(filter)
             .populate('sender', 'name email')
             .populate('deliveryMan', 'name email phone')
+            .populate('statusHistory.updatedBy', 'name role')
             .sort({ createdAt: -1 }), // Sort by most recent
         Parcel.countDocuments(filter),
     ]);
@@ -296,7 +301,10 @@ const assignDeliveryMan = async (
     });
 
     await parcel.save();
-    return parcel.populate('deliveryMan', 'name email phone');
+    return parcel.populate([
+        { path: 'deliveryMan', select: 'name email phone' },
+        { path: 'statusHistory.updatedBy', 'select': 'name role' }
+    ]);
 };
 
 /**
@@ -312,6 +320,7 @@ const getParcelsByDeliveryMan = async (
     const [parcels, total] = await Promise.all([
         Parcel.find(filter)
             .populate('sender', 'name email')
+            .populate('statusHistory.updatedBy', 'name role')
             .sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
@@ -329,7 +338,7 @@ const getParcelsByDeliveryMan = async (
 const updateDeliveryStatus = async (
     parcelId: string,
     status: ParcelStatus,
-    deliveryManId: string | Types.ObjectId,
+    user: { userId: string | Types.ObjectId; role: string },
 ): Promise<IParcel> => {
     const parcel = await Parcel.findById(parcelId);
 
@@ -337,12 +346,15 @@ const updateDeliveryStatus = async (
         throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
     }
 
-    // Robust Authorization: Ensure the user updating is the assigned delivery man.
-    // This check works correctly for both populated and unpopulated deliveryMan fields.
-    const assignedDeliveryManId = parcel.deliveryMan ? (parcel.deliveryMan instanceof Types.ObjectId ? parcel.deliveryMan.toString() : (parcel.deliveryMan as IUser)._id.toString()) : null;
+    // Authorization check: An ADMIN can update any parcel.
+    // Otherwise, the user must be the assigned DELIVERY_MAN.
+    if (user.role !== Role.ADMIN) {
+        // Robust Authorization: Ensure the user updating is the assigned delivery man.
+        const assignedDeliveryManId = parcel.deliveryMan ? (parcel.deliveryMan instanceof Types.ObjectId ? parcel.deliveryMan.toString() : (parcel.deliveryMan as IUser)._id.toString()) : null;
 
-    if (assignedDeliveryManId !== deliveryManId.toString()) {
-        throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to update this parcel.');
+        if (assignedDeliveryManId !== user.userId.toString()) {
+            throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to update this parcel.');
+        }
     }
 
     // Business Logic: Define valid status transitions for a delivery man.
@@ -362,14 +374,15 @@ const updateDeliveryStatus = async (
     parcel.statusHistory.push({
         currentStatus: status,
         timestamp: new Date(),
-        updatedBy: new Types.ObjectId(deliveryManId),
-        note: `Status updated to ${status} by delivery man.`,
+        updatedBy: new Types.ObjectId(user.userId),
+        note: `Status updated to ${status} by ${user.role.toLowerCase().replace('_', ' ')}.`,
     });
 
     await parcel.save();
     return parcel.populate([
         { path: 'deliveryMan', select: 'name email phone' },
-        { path: 'sender', select: 'name email' }
+        { path: 'sender', select: 'name email' },
+        { path: 'statusHistory.updatedBy', select: 'name role' }
     ]);
 };
 
