@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import AppError from '../../utils/AppError';
 import { User } from '../users/user.model';
 import { IParcel, IRecipient, ParcelStatus } from './parcel.interface';
+import { IUser } from '../users/user.interface';
 import { Parcel } from './parcel.model';
 
 /**
@@ -94,7 +95,9 @@ const getParcelsBySender = async (
 
     // Run find and countDocuments queries in parallel for efficiency.
     const [parcels, total] = await Promise.all([
-        Parcel.find(filter).sort({ createdAt: -1 }), // Sort by most recent
+        Parcel.find(filter)
+            .populate('deliveryMan', 'name email phone')
+            .sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
 
@@ -112,7 +115,9 @@ const getParcelById = async (
     user: { userId: string | Types.ObjectId; role: string },
 ): Promise<IParcel | null> => {
     // Find a single parcel by its MongoDB document ID.
-    const parcel = await Parcel.findById(parcelId);
+    const parcel = await Parcel.findById(parcelId)
+        .populate('sender', 'name email')
+        .populate('deliveryMan', 'name email phone');
 
     // If no parcel is found, throw an error.
     if (!parcel) {
@@ -124,8 +129,14 @@ const getParcelById = async (
         return parcel;
     }
 
-    // A regular USER can only view a parcel if they are the sender.
-    if (parcel.sender.toString() !== user.userId.toString()) {
+    // Authorization Check: A regular USER can only view a parcel if they are the sender OR the recipient.
+    // Note: Since `sender` is populated, we must access its `_id` property for comparison.
+    const isSender = (parcel.sender as IUser)._id.toString() === user.userId.toString();
+
+    // The recipient might not be a registered user, so we safely check if `recipient.userId` exists.
+    const isRecipient = parcel.recipient.userId?.toString() === user.userId.toString();
+
+    if (user.role !== 'ADMIN' && !isSender && !isRecipient) {
         throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to view this parcel');
     }
 
@@ -185,7 +196,33 @@ const getAllParcels = async (): Promise<{ parcels: IParcel[]; total: number }> =
 
     // Run find and countDocuments queries in parallel for efficiency.
     const [parcels, total] = await Promise.all([
-        Parcel.find(filter).sort({ createdAt: -1 }), // Sort by most recent
+        Parcel.find(filter)
+            .populate('sender', 'name email')
+            .populate('deliveryMan', 'name email phone').sort({ createdAt: -1 }),
+        Parcel.countDocuments(filter),
+    ]);
+
+    // Return both the list of parcels and the total count.
+    return { parcels, total };
+};
+
+/**
+ * Retrieves all parcels addressed to a specific user.
+ * @param receiverId - The ID of the user whose incoming parcels to retrieve.
+ * @returns A promise that resolves to an object containing the array of parcel documents and the total count.
+ */
+const getParcelsByReceiver = async (
+    receiverId: string | Types.ObjectId,
+): Promise<{ parcels: IParcel[]; total: number }> => {
+    // The filter targets the 'userId' field within the nested 'recipient' object.
+    const filter = { 'recipient.userId': receiverId };
+
+    // Run find and countDocuments queries in parallel for efficiency.
+    const [parcels, total] = await Promise.all([
+        Parcel.find(filter)
+            .populate('sender', 'name email')
+            .populate('deliveryMan', 'name email phone')
+            .sort({ createdAt: -1 }), // Sort by most recent
         Parcel.countDocuments(filter),
     ]);
 
@@ -199,5 +236,6 @@ export const parcelService = {
     getParcelsBySender,
     getParcelById,
     cancelParcel,
-    getAllParcels
+    getAllParcels,
+    getParcelsByReceiver,
 };

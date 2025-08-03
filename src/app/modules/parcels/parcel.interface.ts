@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { IUser } from '../users/user.interface';
 
 export enum ParcelStatus {
     PENDING = 'PENDING', // User created, waiting for pickup
@@ -30,12 +31,12 @@ export interface IParcel {
     trackingNumber: string; // A unique tracking number, can be generated
 
     /** Reference to the User who sent the parcel. */
-    sender: Types.ObjectId;
+    sender: Types.ObjectId | Partial<IUser>;
 
     recipient: IRecipient;
 
     /** Reference to the User (role: DELIVERY_MAN) assigned to this parcel. */
-    deliveryMan?: Types.ObjectId;
+    deliveryMan?: Types.ObjectId | Partial<IUser>;
 
     deliveryFee?: number;
 

@@ -73,10 +73,23 @@ const getAllParcels = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const getIncomingParcels = catchAsync(async (req: Request, res: Response) => {
+    const receiverId = req.user!.userId;
+    const { parcels, total } = await parcelService.getParcelsByReceiver(receiverId);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Incoming parcels retrieved successfully',
+        meta: { total },
+        data: parcels,
+    });
+});
+
 export const parcelController = {
     createParcel,
     getMyParcels,
     getParcelById,
     cancelParcel,
     getAllParcels,
+    getIncomingParcels,
 };
