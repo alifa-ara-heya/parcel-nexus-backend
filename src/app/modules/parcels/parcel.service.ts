@@ -51,6 +51,16 @@ const createParcel = async (
             address: payload.recipient.address,
             email: payload.recipient.email, // email is optional
         };
+
+        // --- Smart Enhancement ---
+        // If an email was provided manually, try to find a matching user and link their ID.
+        // This makes the 'incoming parcels' feature work even if the sender doesn't know the recipient's ID.
+        if (finalRecipient.email) {
+            const recipientUser = await User.findOne({ email: finalRecipient.email });
+            if (recipientUser) {
+                finalRecipient.userId = recipientUser._id;
+            }
+        };
     }
     // Case 3: Insufficient information was provided in the request.
     else {
@@ -159,7 +169,10 @@ const cancelParcel = async (parcelId: string, user: { userId: string | Types.Obj
     }
 
     // Security check: An ADMIN can cancel any parcel, otherwise only the sender can.
-    if (user.role !== 'ADMIN' && parcel.sender.toString() !== user.userId.toString()) {
+    // This check is robust for both populated and unpopulated sender fields.
+    const senderId = parcel.sender instanceof Types.ObjectId ? parcel.sender.toString() : (parcel.sender as IUser)._id.toString();
+
+    if (user.role !== Role.ADMIN && senderId !== user.userId.toString()) {
         throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to cancel this parcel');
     }
 
@@ -183,7 +196,10 @@ const cancelParcel = async (parcelId: string, user: { userId: string | Types.Obj
     await parcel.save();
 
     // Return the updated parcel.
-    return parcel;
+    return parcel.populate([
+        { path: 'sender', select: 'name email' },
+        { path: 'deliveryMan', select: 'name email phone' }
+    ]);
 };
 
 /**
@@ -215,7 +231,10 @@ const getParcelsByReceiver = async (
     receiverId: string | Types.ObjectId,
 ): Promise<{ parcels: IParcel[]; total: number }> => {
     // The filter targets the 'userId' field within the nested 'recipient' object.
-    const filter = { 'recipient.userId': receiverId };
+    // We explicitly cast the receiverId to an ObjectId to ensure a correct type match in the query.
+    const filter = {
+        'recipient.userId': new Types.ObjectId(receiverId)
+    };
 
     // Run find and countDocuments queries in parallel for efficiency.
     const [parcels, total] = await Promise.all([
@@ -292,7 +311,7 @@ const getParcelsByDeliveryMan = async (
 
     const [parcels, total] = await Promise.all([
         Parcel.find(filter)
-            .populate('sender', 'name email phone')
+            .populate('sender', 'name email')
             .sort({ createdAt: -1 }),
         Parcel.countDocuments(filter),
     ]);
@@ -318,8 +337,11 @@ const updateDeliveryStatus = async (
         throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
     }
 
-    // Authorization: Ensure the user updating is the assigned delivery man.
-    if (!parcel.deliveryMan || parcel.deliveryMan.toString() !== deliveryManId.toString()) {
+    // Robust Authorization: Ensure the user updating is the assigned delivery man.
+    // This check works correctly for both populated and unpopulated deliveryMan fields.
+    const assignedDeliveryManId = parcel.deliveryMan ? (parcel.deliveryMan instanceof Types.ObjectId ? parcel.deliveryMan.toString() : (parcel.deliveryMan as IUser)._id.toString()) : null;
+
+    if (assignedDeliveryManId !== deliveryManId.toString()) {
         throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to update this parcel.');
     }
 
@@ -345,7 +367,10 @@ const updateDeliveryStatus = async (
     });
 
     await parcel.save();
-    return parcel;
+    return parcel.populate([
+        { path: 'deliveryMan', select: 'name email phone' },
+        { path: 'sender', select: 'name email' }
+    ]);
 };
 
 // Export all service functions as a single object for the controller to use.
