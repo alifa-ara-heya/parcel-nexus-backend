@@ -175,10 +175,29 @@ const cancelParcel = async (parcelId: string, user: { userId: string | Types.Obj
     return parcel;
 };
 
+/**
+ * Retrieves all parcels in the system. (Admin only)
+ * @returns A promise that resolves to an object containing the array of all parcel documents and the total count.
+ */
+const getAllParcels = async (): Promise<{ parcels: IParcel[]; total: number }> => {
+    // An empty filter object will match all documents in the collection.
+    const filter = {};
+
+    // Run find and countDocuments queries in parallel for efficiency.
+    const [parcels, total] = await Promise.all([
+        Parcel.find(filter).sort({ createdAt: -1 }), // Sort by most recent
+        Parcel.countDocuments(filter),
+    ]);
+
+    // Return both the list of parcels and the total count.
+    return { parcels, total };
+};
+
 // Export all service functions as a single object for the controller to use.
 export const parcelService = {
     createParcel,
     getParcelsBySender,
     getParcelById,
     cancelParcel,
+    getAllParcels
 };

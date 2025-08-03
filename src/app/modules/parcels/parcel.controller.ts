@@ -61,9 +61,22 @@ const cancelParcel = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const getAllParcels = catchAsync(async (req: Request, res: Response) => {
+    // In the future, we can pass query params for filtering/pagination here
+    const { parcels, total } = await parcelService.getAllParcels();
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'All parcels retrieved successfully',
+        meta: { total },
+        data: parcels,
+    });
+});
+
 export const parcelController = {
     createParcel,
     getMyParcels,
     getParcelById,
     cancelParcel,
+    getAllParcels,
 };

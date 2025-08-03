@@ -1,4 +1,3 @@
-import bcryptjs from 'bcryptjs';
 // Making an admin if no admin exists when we restart our server 
 
 import { envVars } from "../config/env"
@@ -17,8 +16,6 @@ export const createAdmin = async () => {
 
         console.log('Trying to create admin');
 
-        const hashedPassword = await bcryptjs.hash(envVars.ADMIN_PASSWORD, envVars.BCRYPT_SALT_ROUNDS)
-
         const authProvider: IAuthProvider = {
             provider: 'credentials',
             providerId: envVars.ADMIN_EMAIL
@@ -28,7 +25,7 @@ export const createAdmin = async () => {
             name: "Admin",
             role: Role.ADMIN,
             email: envVars.ADMIN_EMAIL,
-            password: hashedPassword,
+            password: envVars.ADMIN_PASSWORD, // Pass the plain password, the pre-save hook will hash it.
             isVerified: true,
             auths: [authProvider]
         }

@@ -18,6 +18,11 @@ router.get('/me',
     parcelController.getMyParcels
 );
 
+router.get('/all',
+    checkAuth(Role.ADMIN),
+    parcelController.getAllParcels
+);
+
 router.get('/:id',
     checkAuth(Role.USER, Role.ADMIN),
     parcelController.getParcelById
