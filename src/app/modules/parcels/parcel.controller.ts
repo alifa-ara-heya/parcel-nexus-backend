@@ -4,6 +4,7 @@ import httpStatus from 'http-status-codes';
 import { catchAsync } from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { parcelService } from './parcel.service';
+// import { parcelService } from './parcel.service';
 
 const createParcel = catchAsync(async (req: Request, res: Response) => {
     // We use the non-null assertion (!) because the checkAuth middleware guarantees
@@ -85,6 +86,46 @@ const getIncomingParcels = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const assignDeliveryMan = catchAsync(async (req: Request, res: Response) => {
+    const { id: parcelId } = req.params;
+    const { deliveryManId } = req.body;
+    const adminId = req.user!.userId;
+
+    const result = await parcelService.assignDeliveryMan(parcelId, deliveryManId, adminId);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Delivery man assigned successfully',
+        data: result,
+    });
+});
+
+const getMyDeliveries = catchAsync(async (req: Request, res: Response) => {
+    const deliveryManId = req.user!.userId;
+    const { parcels, total } = await parcelService.getParcelsByDeliveryMan(deliveryManId);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Assigned parcels retrieved successfully',
+        meta: { total },
+        data: parcels,
+    });
+});
+
+const updateDeliveryStatus = catchAsync(async (req: Request, res: Response) => {
+    const { id: parcelId } = req.params;
+    const { status } = req.body;
+    const deliveryManId = req.user!.userId;
+
+    const result = await parcelService.updateDeliveryStatus(parcelId, status, deliveryManId);
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'Parcel status updated successfully',
+        data: result,
+    });
+});
+
 export const parcelController = {
     createParcel,
     getMyParcels,
@@ -92,4 +133,7 @@ export const parcelController = {
     cancelParcel,
     getAllParcels,
     getIncomingParcels,
+    assignDeliveryMan,
+    getMyDeliveries,
+    updateDeliveryStatus,
 };

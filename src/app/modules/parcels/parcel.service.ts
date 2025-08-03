@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import AppError from '../../utils/AppError';
 import { User } from '../users/user.model';
 import { IParcel, IRecipient, ParcelStatus } from './parcel.interface';
-import { IUser } from '../users/user.interface';
+import { IUser, Role } from '../users/user.interface';
 import { Parcel } from './parcel.model';
 
 /**
@@ -230,6 +230,124 @@ const getParcelsByReceiver = async (
     return { parcels, total };
 };
 
+/**
+ * Assigns a delivery man to a parcel. (Admin only)
+ * @param parcelId - The ID of the parcel to be assigned.
+ * @param deliveryManId - The ID of the user to assign as the delivery man.
+ * @param adminId - The ID of the admin performing the action.
+ * @returns The updated parcel document.
+ */
+const assignDeliveryMan = async (
+    parcelId: string,
+    deliveryManId: string,
+    adminId: string | Types.ObjectId,
+): Promise<IParcel> => {
+    // Find the parcel and the potential delivery man concurrently for efficiency.
+    const [parcel, deliveryMan] = await Promise.all([
+        Parcel.findById(parcelId),
+        User.findById(deliveryManId),
+    ]);
+
+    // Validate that both documents exist.
+    if (!parcel) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
+    }
+    if (!deliveryMan) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Delivery man user not found.');
+    }
+
+    // Validate the user's role.
+    if (deliveryMan.role !== Role.DELIVERY_MAN) {
+        throw new AppError(httpStatus.BAD_REQUEST, 'The assigned user is not a delivery man.');
+    }
+
+    // Business logic: A parcel can only be assigned if it's PENDING.
+    if (parcel.currentStatus !== ParcelStatus.PENDING) {
+        throw new AppError(httpStatus.BAD_REQUEST, `Parcel cannot be assigned. Current status is ${parcel.currentStatus}.`);
+    }
+
+    // Update the parcel document.
+    parcel.deliveryMan = deliveryMan._id;
+    parcel.currentStatus = ParcelStatus.PICKED_UP; // The parcel is now considered picked up by the delivery man.
+    parcel.statusHistory.push({
+        currentStatus: ParcelStatus.PICKED_UP,
+        timestamp: new Date(),
+        updatedBy: new Types.ObjectId(adminId),
+        note: `Assigned to delivery man: ${deliveryMan.name}.`,
+    });
+
+    await parcel.save();
+    return parcel.populate('deliveryMan', 'name email phone');
+};
+
+/**
+ * Retrieves all parcels assigned to a specific delivery man.
+ * @param deliveryManId - The ID of the delivery man.
+ * @returns A promise that resolves to an object containing the array of parcel documents and the total count.
+ */
+const getParcelsByDeliveryMan = async (
+    deliveryManId: string | Types.ObjectId,
+): Promise<{ parcels: IParcel[]; total: number }> => {
+    const filter = { deliveryMan: deliveryManId };
+
+    const [parcels, total] = await Promise.all([
+        Parcel.find(filter)
+            .populate('sender', 'name email phone')
+            .sort({ createdAt: -1 }),
+        Parcel.countDocuments(filter),
+    ]);
+
+    return { parcels, total };
+};
+
+/**
+ * Updates the status of a parcel by the assigned delivery man.
+ * @param parcelId - The ID of the parcel to update.
+ * @param status - The new status to set.
+ * @param deliveryManId - The ID of the delivery man performing the update.
+ * @returns The updated parcel document.
+ */
+const updateDeliveryStatus = async (
+    parcelId: string,
+    status: ParcelStatus,
+    deliveryManId: string | Types.ObjectId,
+): Promise<IParcel> => {
+    const parcel = await Parcel.findById(parcelId);
+
+    if (!parcel) {
+        throw new AppError(httpStatus.NOT_FOUND, 'Parcel not found.');
+    }
+
+    // Authorization: Ensure the user updating is the assigned delivery man.
+    if (!parcel.deliveryMan || parcel.deliveryMan.toString() !== deliveryManId.toString()) {
+        throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to update this parcel.');
+    }
+
+    // Business Logic: Define valid status transitions for a delivery man.
+    const validTransitions: Partial<Record<ParcelStatus, ParcelStatus[]>> = {
+        [ParcelStatus.PICKED_UP]: [ParcelStatus.IN_TRANSIT, ParcelStatus.DELIVERED],
+        [ParcelStatus.IN_TRANSIT]: [ParcelStatus.DELIVERED, ParcelStatus.RETURNED],
+    };
+
+    const allowedNextStatuses = validTransitions[parcel.currentStatus];
+
+    if (!allowedNextStatuses || !allowedNextStatuses.includes(status)) {
+        throw new AppError(httpStatus.BAD_REQUEST, `Cannot change status from ${parcel.currentStatus} to ${status}.`);
+    }
+
+    // Update the parcel status
+    parcel.currentStatus = status;
+    parcel.statusHistory.push({
+        currentStatus: status,
+        timestamp: new Date(),
+        updatedBy: new Types.ObjectId(deliveryManId),
+        note: `Status updated to ${status} by delivery man.`,
+    });
+
+    await parcel.save();
+    return parcel;
+};
+
 // Export all service functions as a single object for the controller to use.
 export const parcelService = {
     createParcel,
@@ -238,4 +356,7 @@ export const parcelService = {
     cancelParcel,
     getAllParcels,
     getParcelsByReceiver,
+    assignDeliveryMan,
+    getParcelsByDeliveryMan,
+    updateDeliveryStatus,
 };

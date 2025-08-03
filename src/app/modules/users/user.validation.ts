@@ -39,3 +39,7 @@ export const createUserZodSchema = z.object({
 
     // })
 });
+
+export const assignRoleZodSchema = z.object({
+    role: z.enum(Role, { error: "A valid role is required." }),
+});

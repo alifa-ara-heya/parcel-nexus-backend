@@ -20,3 +20,7 @@ export const createParcelZodSchema = z.object({
 export const updateParcelStatusZodSchema = z.object({
     status: z.enum(Object.values(ParcelStatus)),
 });
+
+export const assignDeliveryManZodSchema = z.object({
+    deliveryManId: z.string({ error: "deliveryManId is required." }),
+});

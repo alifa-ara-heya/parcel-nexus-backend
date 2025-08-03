@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { checkAuth } from '../../middlewares/checkAuth';
 import { validateRequest } from '../../middlewares/validateRequest';
 import { parcelController } from './parcel.controller';
-import { createParcelZodSchema } from './parcel.validation';
+import { assignDeliveryManZodSchema, createParcelZodSchema, updateParcelStatusZodSchema } from './parcel.validation';
 import { Role } from '../users/user.interface';
 
 const router = Router();
@@ -23,6 +23,11 @@ router.get('/incoming',
     parcelController.getIncomingParcels
 );
 
+router.get('/my-deliveries',
+    checkAuth(Role.DELIVERY_MAN),
+    parcelController.getMyDeliveries
+);
+
 router.get('/all',
     checkAuth(Role.ADMIN),
     parcelController.getAllParcels
@@ -36,6 +41,18 @@ router.get('/:id',
 router.patch('/:id/cancel',
     checkAuth(Role.USER, Role.ADMIN),
     parcelController.cancelParcel
+);
+
+router.patch('/:id/assign',
+    checkAuth(Role.ADMIN),
+    validateRequest(assignDeliveryManZodSchema),
+    parcelController.assignDeliveryMan
+);
+
+router.patch('/:id/update-delivery-status',
+    checkAuth(Role.DELIVERY_MAN),
+    validateRequest(updateParcelStatusZodSchema),
+    parcelController.updateDeliveryStatus
 );
 
 export const ParcelRoutes = router;

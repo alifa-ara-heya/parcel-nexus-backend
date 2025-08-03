@@ -15,6 +15,21 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const assignRole = catchAsync(async (req: Request, res: Response) => {
+    const { id: userId } = req.params;
+    const { role } = req.body;
+
+    const result = await userService.assignRole(userId, role);
+
+    sendResponse(res, {
+        statusCode: httpStatus.OK,
+        success: true,
+        message: 'User role updated successfully',
+        data: result,
+    });
+});
+
 export const userController = {
     createUser,
+    assignRole,
 };

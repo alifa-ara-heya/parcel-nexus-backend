@@ -13,7 +13,7 @@ export enum Role {
     USER = "USER",
     SENDER = "SENDER",
     RECEIVER = "RECEIVER",
-    // DELIVERY_MAN = "DELIVERY_MAN",
+    DELIVERY_MAN = "DELIVERY_MAN",
 }
 
 export interface IAuthProvider {
